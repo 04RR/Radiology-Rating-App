@@ -29,6 +29,23 @@ function App() {
     return params.get('admin') === 'true';
   });
 
+  // Load CSV data on mount
+  useEffect(() => {
+    fetch('/dummy-data.csv')
+      .then(response => response.blob())
+      .then(blob => {
+        const file = new File([blob], 'dummy-data.csv', { type: 'text/csv' });
+        return parseReportsCSV(file);
+      })
+      .then(loadedReports => {
+        setReports(loadedReports);
+      })
+      .catch(error => {
+        console.error('Error loading CSV:', error);
+        alert('Error loading reports data. Please try again later.');
+      });
+  }, []);
+
   useEffect(() => {
     if (currentUser) {
       const savedRatings = getRatings(currentUser.id);
@@ -53,22 +70,6 @@ function App() {
       setModelScores(currentRating?.modelRatings || []);
     }
   }, [currentIndex, ratings, reports]);
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      try {
-        const loadedReports = await parseReportsCSV(file);
-        setReports(loadedReports);
-        // Reset ratings for all users when new reports are loaded
-        localStorage.clear();
-        window.location.reload();
-      } catch (error) {
-        console.error('Error loading CSV:', error);
-        alert('Error loading CSV file. Please check the format.');
-      }
-    }
-  };
 
   const handleScoreChange = (modelIndex: number, scoreType: keyof Scores, value: number) => {
     setModelScores(prev => {
@@ -126,44 +127,11 @@ function App() {
   }
 
   if (reports.length === 0) {
-    if (!isAdmin) {
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="bg-white p-8 rounded-lg shadow-lg text-center">
-            <h1 className="text-2xl font-bold mb-4">No Reports Available</h1>
-            <p className="text-gray-600">Please wait for an administrator to load the reports.</p>
-          </div>
-        </div>
-      );
-    }
-
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white p-8 rounded-lg shadow-lg text-center">
-          <h1 className="text-2xl font-bold mb-4">Upload Reports CSV</h1>
-          <p className="text-gray-600 mb-4">Please upload a CSV file with the following columns:</p>
-          <ul className="text-left text-sm text-gray-600 mb-6 space-y-1">
-            <li>• idx (number)</li>
-            <li>• image_path (URL)</li>
-            <li>• model1_response (text)</li>
-            <li>• model2_response (text)</li>
-            <li>• model3_response (text)</li>
-            <li>• model4_response (text)</li>
-            <li>• model5_response (text)</li>
-          </ul>
-          <label className="block w-full">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleFileUpload}
-              className="block w-full text-sm text-gray-500
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-full file:border-0
-                file:text-sm file:font-semibold
-                file:bg-blue-50 file:text-blue-700
-                hover:file:bg-blue-100"
-            />
-          </label>
+          <h1 className="text-2xl font-bold mb-4">Loading Reports</h1>
+          <p className="text-gray-600">Please wait while we load the report data...</p>
         </div>
       </div>
     );
@@ -182,40 +150,28 @@ function App() {
           </div>
           <div className="flex gap-4">
             {isAdmin && (
-              <>
-                <label className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer">
-                  <Upload size={20} />
-                  <span>Upload New CSV</span>
-                  <input
-                    type="file"
-                    accept=".csv"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </label>
-                <div className="bg-gray-100 p-4 rounded-lg">
-                  <div className="flex items-center gap-2 text-gray-700 mb-2">
-                    <Users size={20} />
-                    <span>
-                      {stats.activeRadiologists} active / {stats.totalRadiologists} total radiologists
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    {stats.completionRates.map(rate => (
-                      <div key={rate.userId} className="flex items-center gap-2 text-sm">
-                        <CheckCircle size={16} className="text-green-600" />
-                        <span>{rate.name}:</span>
-                        <span className="font-medium">
-                          {((rate.completed / rate.total) * 100).toFixed(1)}%
-                        </span>
-                        <span className="text-gray-500">
-                          ({rate.completed}/{rate.total})
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+              <div className="bg-gray-100 p-4 rounded-lg">
+                <div className="flex items-center gap-2 text-gray-700 mb-2">
+                  <Users size={20} />
+                  <span>
+                    {stats.activeRadiologists} active / {stats.totalRadiologists} total radiologists
+                  </span>
                 </div>
-              </>
+                <div className="space-y-1">
+                  {stats.completionRates.map(rate => (
+                    <div key={rate.userId} className="flex items-center gap-2 text-sm">
+                      <CheckCircle size={16} className="text-green-600" />
+                      <span>{rate.name}:</span>
+                      <span className="font-medium">
+                        {((rate.completed / rate.total) * 100).toFixed(1)}%
+                      </span>
+                      <span className="text-gray-500">
+                        ({rate.completed}/{rate.total})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
             <button
               onClick={handleExport}
